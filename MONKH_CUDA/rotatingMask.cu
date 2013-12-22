@@ -8,36 +8,6 @@
 // Helper functions and utilities to work with CUDA
 #include <helper_functions.h>
 
-
-int init(int block_dim, unsigned char * img, int rows, int cols, unsigned char * filtered_img) {
-
-	// Device input image and filtered image
-	unsigned char *d_img, *d_filtered;
-	int size = rows * cols * sizeof(unsigned char);
-
-	// Allocate and copy input image to device
-	cudaMalloc((void**) &d_img, size);
-	cudaMemcpy(d_img, img, cudaMemCpyHostToDevice);
-
-	// Allocate memory for output image
-	cudaMalloc((void**) &d_filtered. size);
-
-	// Define grid and block dimensions
-	dim3 block(block_dim,block_dim,1);
-	dim3 grid(ceil(cols/block_dim),ceil(rows/block_dim),1);
-
-	// Kernel invocations
-	rotatingMaskCUDA <<grid,block>> (d_filtered, d_img, n, m);
-	getArrayMin<<grid, block>>(d_filtered, n, m);
-
-	// Copy the filtered image to the host memory
-	cudaMemcpy(filtered_img, d_filtered, cudaMemCpyDeviceToHost);
-
-	// Free allocated memory
-	cudaFree(d_img); cudaFree(d_filtered);
-}
-
-
 /* The device kernel, takes as input the noisy image
  * and outputs the filtered image
  */
@@ -45,7 +15,7 @@ template <int BLOCK_SIZE> __global__ void
 rotatingMaskCUDA(unsigned char * filtered, unsigned char * img, int n, int m)
 {
 
-	__Shared__ unsigned char input_img [BLOCK_SIZE][BLOCK_SIZE];
+	__shared__ unsigned char input_img [BLOCK_SIZE][BLOCK_SIZE];
 
     // Block index
     int bx = blockIdx.x;
@@ -62,7 +32,7 @@ rotatingMaskCUDA(unsigned char * filtered, unsigned char * img, int n, int m)
 
     // Upper-left corner
     if (bx == 0 && by == 0)
-    	continue;
+    	;
 
     // Lower-left corner
     else if (bx == 0 && by == ((m/BLOCK_SIZE) - 1 ))
@@ -117,7 +87,7 @@ rotatingMaskCUDA(unsigned char * filtered, unsigned char * img, int n, int m)
 }
 
 template <int BLOCK_SIZE> __global__ void
-getArrayMin(unsigned char * input_img, unsigned char * output_img, int n, int m)
+getArrayMin(unsigned char * output_img, unsigned char * input_img, int n, int m)
 {
     /* Calculate the index of the 2d array */
     int bx = blockIdx.x;
@@ -137,4 +107,42 @@ getArrayMin(unsigned char * input_img, unsigned char * output_img, int n, int m)
     }
 
     output_img[col + row * n] = min;
+}
+
+void init(int block_dim, unsigned char * img, int rows, int cols, unsigned char * filtered_img) {
+
+	// Device input image and filtered image
+	unsigned char *d_img, *d_tmp, *d_filtered;
+	int size = rows * cols * sizeof(unsigned char);
+
+	// Allocate and copy input image to device
+	cudaMalloc((void**) &d_img, size);
+	cudaMemcpy(d_img, img, size, cudaMemcpyHostToDevice);
+
+	// Allocate memory for tmp matrix
+	cudaMalloc((void**) &d_tmp, size * 9);
+
+	// Allocate memory for output image
+	cudaMalloc((void**) &d_filtered, size);
+
+	// Define grid and block dimensions
+	dim3 block(block_dim,block_dim,1);
+	dim3 grid(ceil(cols/block_dim), ceil(rows/block_dim),1);
+
+	// Kernel invocations
+	rotatingMaskCUDA<16><<<grid,block>>> (d_tmp, d_img, rows, cols);
+	getArrayMin<16><<<grid, block>>> (d_filtered, d_tmp, rows, cols);
+
+	// Copy the filtered image to the host memory
+	cudaMemcpy(filtered_img, d_filtered, size, cudaMemcpyDeviceToHost);
+
+	// Free allocated memory
+	cudaFree(d_img);
+	cudaFree(d_tmp);
+	cudaFree(d_filtered);
+}
+
+int main(int argc, char **argv)
+{
+	return 1;
 }
