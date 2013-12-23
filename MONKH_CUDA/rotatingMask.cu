@@ -144,6 +144,44 @@ void init(int block_dim, unsigned char * img, int rows, int cols, unsigned char 
 
 int main(int argc, char **argv)
 {
+
+	printf("[Rotating mask technique for image filtering Using CUDA] - Starting...\n");
+
+	// By default, we use device 0, otherwise we override the device ID based on what is provided at the command line
+    int devID = 0;
+
+    if (checkCmdLineFlag(argc, (const char **)argv, "device"))
+    {
+        devID = getCmdLineArgumentInt(argc, (const char **)argv, "device");
+        cudaSetDevice(devID);
+    }
+
+    cudaError_t error;
+    cudaDeviceProp deviceProp;
+    error = cudaGetDevice(&devID);
+
+    if (error != cudaSuccess)
+    {
+        printf("cudaGetDevice returned error code %d, line(%d)\n", error, __LINE__);
+    }
+
+    error = cudaGetDeviceProperties(&deviceProp, devID);
+
+    if (deviceProp.computeMode == cudaComputeModeProhibited)
+    {
+        fprintf(stderr, "Error: device is running in <Compute Mode Prohibited>, no threads can use ::cudaSetDevice().\n");
+        exit(EXIT_SUCCESS);
+    }
+
+    if (error != cudaSuccess)
+    {
+        printf("cudaGetDeviceProperties returned error code %d, line(%d)\n", error, __LINE__);
+    }
+    else
+    {
+        printf("GPU Device %d: \"%s\" with compute capability %d.%d\n\n", devID, deviceProp.name, deviceProp.major, deviceProp.minor);
+    }
+
 	// Random number generator
 	srand(time(NULL));
 
