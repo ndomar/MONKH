@@ -130,8 +130,8 @@ void init(int block_dim, unsigned char * img, int rows, int cols, unsigned char 
 	dim3 grid(ceil(cols/block_dim), ceil(rows/block_dim),1);
 
 	// Kernel invocations
-	rotatingMaskCUDA<16><<<grid,block>>> (d_tmp, d_img, rows, cols);
-	getArrayMin<16><<<grid, block>>> (d_filtered, d_tmp, rows, cols);
+	rotatingMaskCUDA<8><<<grid,block>>> (d_tmp, d_img, rows, cols);
+	getArrayMin<8><<<grid, block>>> (d_filtered, d_tmp, rows, cols);
 
 	// Copy the filtered image to the host memory
 	cudaMemcpy(filtered_img, d_filtered, size, cudaMemcpyDeviceToHost);
@@ -144,5 +144,45 @@ void init(int block_dim, unsigned char * img, int rows, int cols, unsigned char 
 
 int main(int argc, char **argv)
 {
+	// Random number generator
+	srand(time(NULL));
+
+	// Size of input and output images
+	unsigned int size = 16 * 16 * sizeof(unsigned char);
+
+	unsigned char *matrix = (unsigned char *)malloc(size);
+	unsigned char *filtered_img = (unsigned char *)malloc(size);
+
+	for(int i = 0; i < 16; i++)
+	{
+		for(int j = 0; j < 16; j++)
+		{
+			matrix[i + j * 16] = rand() % 256 ;
+		}
+	}
+
+	init(8, matrix, 16, 16, filtered_img);
+
+	for(int i = 0; i < 16; i++)
+	{
+		for(int j = 0; j < 16; j++)
+		{
+			printf("%d ", matrix[i + j * 16]);
+		}
+		printf("\n");
+	}
+
+	printf("Filtered\n");
+	printf("\n");
+
+	for(int i = 0; i < 16; i++)
+	{
+		for(int j = 0; j < 16; j++)
+		{
+			printf("%d ", filtered_img[i + j * 16]);
+		}
+		printf("\n");
+	}
+
 	return 1;
 }
