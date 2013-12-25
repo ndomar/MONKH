@@ -15,9 +15,11 @@
 
 #define FILTER_DIM 3
 
+enum Channel { Red, Green, Blue, Alpha};
+
 // returns index of minimum element in array
-int min_elem_idx(float array[], int len) {
-    float min = array[0];
+int min_elem_idx(int array[], int len) {
+    int min = array[0];
     int min_idx = 0;
     int i = 0;
     while (i < len) {
@@ -30,8 +32,6 @@ int min_elem_idx(float array[], int len) {
     return min_idx;
 }
 
-// img_in   : input image of size ROWS x COLS
-// img_out  : image after applying rotating mask filter
 void rot_mask_seq(char* fileIn, char* fileOut) {
     // read input image
     BMP img_in;
@@ -43,16 +43,25 @@ void rot_mask_seq(char* fileIn, char* fileOut) {
     // create output image
     BMP img_out;
     img_out.SetSize(width,height);
-    img_out.SetBitDepth(8);
+    img_out.SetBitDepth(24);
     
     int i = 0;
     int j = 0;
 
     for ( i = 0; i < height; i++) {
         for ( j = 0; j < width; j++) {
-            float avgs[FILTER_DIM*FILTER_DIM];
-            float dispersions[FILTER_DIM*FILTER_DIM];
+            int avgs_r[FILTER_DIM*FILTER_DIM];
+			int avgs_g[FILTER_DIM*FILTER_DIM];
+			int avgs_b[FILTER_DIM*FILTER_DIM];
+			int avgs_a[FILTER_DIM*FILTER_DIM];
+			
+            int dispersions_r[FILTER_DIM*FILTER_DIM];
+			int dispersions_g[FILTER_DIM*FILTER_DIM];
+			int dispersions_b[FILTER_DIM*FILTER_DIM];
+			int dispersions_a[FILTER_DIM*FILTER_DIM];
+			
             int count = 0;
+			
             // try all windows containing pixel (i,j)
             int k;
             int l;
@@ -61,9 +70,10 @@ void rot_mask_seq(char* fileIn, char* fileOut) {
                     // only windows fully inside image borders are used
                     if (i + k >= 0 && i + k + FILTER_DIM - 1 < height &&
                         j + l >= 0 && j + l + FILTER_DIM - 1 < width) {
-                        
-                        float dispersion = 0;
-                        float avg = 0;                        
+
+						// perform computation for RED channel
+                        int dispersion = 0;
+                        int avg = 0;                        
                         // compute average brightness in window
                         int m;
                         int n;
@@ -72,8 +82,8 @@ void rot_mask_seq(char* fileIn, char* fileOut) {
                                 avg += img_in(i + k + m, j + l + n)->Red;
                             }
                         }
-                        avg /= FILTER_DIM * FILTER_DIM;
-                        avgs[count] = avg;
+                        avg /= FILTER_DIM * FILTER_DIM * 1.0;
+                        avgs_r[count] = avg;
                         
                         // compute brightness dispersion in window
                         for ( m = 0; m < FILTER_DIM; m++) {
@@ -81,16 +91,81 @@ void rot_mask_seq(char* fileIn, char* fileOut) {
                                 dispersion += powf(img_in(i + k + m, j + l + n)->Red - avg, 2);
                             }
                         }
-                        dispersion /= FILTER_DIM * FILTER_DIM;
-                        dispersions[count] = dispersion;   
+                        dispersion /= FILTER_DIM * FILTER_DIM * 1.0;
+                        dispersions_r[count] = dispersion;
+						
+						// perform computation for GREEN channel
+                        dispersion = 0;
+                        avg = 0;                        
+                        // compute average brightness in window
+                        for ( m = 0; m < FILTER_DIM; m++) {
+                            for ( n = 0; n < FILTER_DIM; n++) {
+                                avg += img_in(i + k + m, j + l + n)->Green;
+                            }
+                        }
+                        avg /= FILTER_DIM * FILTER_DIM * 1.0;
+                        avgs_g[count] = avg;
+                        
+                        // compute brightness dispersion in window
+                        for ( m = 0; m < FILTER_DIM; m++) {
+                            for ( n = 0; n < FILTER_DIM; n++) {
+                                dispersion += powf(img_in(i + k + m, j + l + n)->Green - avg, 2);
+                            }
+                        }
+                        dispersion /= FILTER_DIM * FILTER_DIM * 1.0;
+                        dispersions_g[count] = dispersion;
+						
+						// perform computation for BLUE channel
+                        dispersion = 0;
+                        avg = 0;                        
+                        // compute average brightness in window
+                        for ( m = 0; m < FILTER_DIM; m++) {
+                            for ( n = 0; n < FILTER_DIM; n++) {
+                                avg += img_in(i + k + m, j + l + n)->Blue;
+                            }
+                        }
+                        avg /= FILTER_DIM * FILTER_DIM * 1.0;
+                        avgs_b[count] = avg;
+                        
+                        // compute brightness dispersion in window
+                        for ( m = 0; m < FILTER_DIM; m++) {
+                            for ( n = 0; n < FILTER_DIM; n++) {
+                                dispersion += powf(img_in(i + k + m, j + l + n)->Blue - avg, 2);
+                            }
+                        }
+                        dispersion /= FILTER_DIM * FILTER_DIM * 1.0;
+                        dispersions_b[count] = dispersion;
+						
+						   // perform computation for ALPHA channel
+                        dispersion = 0;
+                        avg = 0;                        
+                        // compute average brightness in window
+                        for ( m = 0; m < FILTER_DIM; m++) {
+                            for ( n = 0; n < FILTER_DIM; n++) {
+                                avg += img_in(i + k + m, j + l + n)->Alpha;
+                            }
+                        }
+                        avg /= FILTER_DIM * FILTER_DIM * 1.0;
+                        avgs_a[count] = avg;
+                        
+                        // compute brightness dispersion in window
+                        for ( m = 0; m < FILTER_DIM; m++) {
+                            for ( n = 0; n < FILTER_DIM; n++) {
+                                dispersion += powf(img_in(i + k + m, j + l + n)->Alpha - avg, 2);
+                            }
+                        }
+                        dispersion /= FILTER_DIM * FILTER_DIM * 1.0;
+                        dispersions_a[count] = dispersion;
+						   
                         count++;
                     }
                 }
             }
             // use average of window with minimum dispersion in output image
-            img_out(i,j)->Red = (int) avgs[min_elem_idx(dispersions,count)];
-            img_out(i,j)->Green = (int) avgs[min_elem_idx(dispersions,count)];
-            img_out(i,j)->Blue = (int) avgs[min_elem_idx(dispersions,count)];
+            img_out(i,j)->Red = (int) avgs_r[min_elem_idx(dispersions_r,count)];
+            img_out(i,j)->Green = (int) avgs_g[min_elem_idx(dispersions_g,count)];
+            img_out(i,j)->Blue = (int) avgs_b[min_elem_idx(dispersions_b,count)];
+			img_out(i,j)->Alpha = (int) avgs_a[min_elem_idx(dispersions_a,count)];
         }
     }
     img_out.WriteToFile(fileOut);
@@ -120,12 +195,6 @@ void toGrayScale(BMP img, char* newImg)
 }
 
 int main(int argc, char** argv) {
-    BMP anImage;
-    anImage.ReadFromFile("vtr.bmp");
-    BMP grayImg;
-    toGrayScale(anImage, "image_gray.bmp");
-    grayImg.ReadFromFile("image_gray.bmp");
-    rot_mask_seq("image_gray.bmp", "filtered_img.bmp");
+    rot_mask_seq("lena_noise.bmp", "lena_noise_filtered.bmp");
     return 0;
 }
-
