@@ -6,132 +6,167 @@
 #include <cuda_runtime.h>
 
 // Helper functions and utilities to work with CUDA
-#include <helper_functions.h>
+//#include <helper_functions.h>
+
+typedef struct {
+	int avgerages[9];
+	int dispersions[9];
+} Pair;
 
 /* The device kernel, takes as input the noisy image
  * and outputs the filtered image
  */
-template <int BLOCK_SIZE> __global__ void
-rotatingMaskCUDA(unsigned char * filtered, unsigned char * img, int n, int m)
-{
+template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
+		unsigned char * img, int n, int m) {
+	__shared__ unsigned char input_img[BLOCK_SIZE][BLOCK_SIZE];
 
-	__shared__ unsigned char input_img [BLOCK_SIZE][BLOCK_SIZE];
+	// Block index
+	int bx = blockIdx.x;
+	int by = blockIdx.y;
 
-    // Block index
-    int bx = blockIdx.x;
-    int by = blockIdx.y;
+	// Thread index
+	int tx = threadIdx.x;
+	int ty = threadIdx.y;
 
-    // Thread index
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
+	int row = by * BLOCK_SIZE + ty;
+	int col = bx * BLOCK_SIZE + tx;
 
-    int row = by * BLOCK_SIZE + ty;
-    int col = bx * BLOCK_SIZE + tx;
+	/* Overlapping the tiles */
+	row -= 2 * by;
+	col -= 2 * bx;
 
-    /* Overlapping the tiles */
+	if (row < m && col < n) {
 
-    // Upper-left corner
-    if (bx == 0 && by == 0)
-    	;
+		input_img[ty][tx] = img[n * row + col];
 
-    // Lower-left corner
-    else if (bx == 0 && by == ((m/BLOCK_SIZE) - 1 ))
-    	row -= 2;
 
-    // Upper-right corner
-    else if (by == 0 )
-    	col -= 2;
+		__syncthreads();
 
-    else {
-    	row -= 2;
-    	col -= 2;
-    }
+		int numberOfBlocksx = (int) ceil((n * 1.0) / (BLOCK_SIZE - 2));
+		int numberOfBlocksy = (int) ceil((m * 1.0) / (BLOCK_SIZE - 2));
+		// Check if this pixel should compute the average and the dispersion
+		if ((bx < numberOfBlocksx - 1
+				|| (bx == numberOfBlocksx - 1
+						&& (tx < n - bx * (BLOCK_SIZE - 2) - 2)))
+				&& (by < numberOfBlocksy - 1
+						|| (by == numberOfBlocksy - 1
+								&& (ty < m - by * (BLOCK_SIZE - 2) - 2))))
+			if (tx < 6 && ty < 6) {
 
-    input_img[ty][tx] = img[n*row + col];
+				/* Calculate the average for the mask
+				 * with the current pixel positioned at
+				 * the upper-left corner */
 
-    __syncthreads();
+				int sum = 0;
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
 
-    /* Calculating the mask with the current pixel
-     * positioned at the upper-left corner */
-    int delta [3] = {0, 1, 2};
+						int tmp_col = tx + j;
+						int tmp_row = ty + i;
 
-    int sum = 0;
-    for(int i = 0; i < 3; i++)
-    {
-    	for(int j = 0; j < 3; j++)
-    	{
-    		int tmp_col = tx + delta [j];
-    		int tmp_row = ty + delta [i];
-    		sum += input_img[tmp_row][tmp_col];
-    	}
-    }
+						sum += input_img[tmp_row][tmp_col];
+					}
+				}
 
-    int average = sum / 9;
+				int average = sum / 9;
 
-    /* Assign the value of the calculated mask to each pixel
-     * i.e. the current mask will be added to index 0
-     * of the Upper left pixel, and index 1 of the
-     * Upper left-but-one pixel, and so on.
-     */
-    int index = 0;
-    for(int i = 0; i < 3; i++)
-    {
-    	for(int j = 0; j < 3; j++)
-    	{
-    		int tmp_col = col + delta [j];
-    		int tmp_row = row + delta [i];
-    		filtered[tmp_col + tmp_row * n + index * tmp_col * tmp_row] = average;
-    		index++;
-    	}
-    }
+				/* Calculate the dispersion for the mask
+				 * with the current pixel positioned at
+				 * the upper-left corner */
+				int dispersion = 0;
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
+						int tmp_col = tx + j;
+						int tmp_row = ty + i;
+						dispersion += powf(
+								input_img[tmp_row][tmp_col] - average, 2);
+					}
+				}
+
+				dispersion /= 9;
+
+				/* Assign the value of the calculated mask to each pixel
+				 * i.e. the current mask will be added to index 0
+				 * of the Upper left pixel, and index 1 of the
+				 * Upper left-but-one pixel, and so on.
+				 */
+				int index = 0;
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
+						int tmp_col = col + j;
+						int tmp_row = row + i;
+
+						filtered[tmp_col + tmp_row * n].avgerages[index] =
+								average;
+						filtered[tmp_col + tmp_row * n].dispersions[index] =
+								dispersion;
+						index++;
+					}
+				}
+			}
+	}
 }
 
-template <int BLOCK_SIZE> __global__ void
-getArrayMin(unsigned char * output_img, unsigned char * input_img, int n, int m)
-{
-    /* Calculate the index of the 2d array */
-    int bx = blockIdx.x;
-    int by = blockIdx.y;
+template<int BLOCK_SIZE> __global__ void getArrayMin(unsigned char * output_img,
+		Pair * input_img, int n, int m) {
+	/* Calculate the index of the 2d array */
+	int bx = blockIdx.x;
+	int by = blockIdx.y;
 
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
+	int tx = threadIdx.x;
+	int ty = threadIdx.y;
 
-    int row = by * BLOCK_SIZE + ty;
-    int col = bx * BLOCK_SIZE + tx;
+	int row = by * BLOCK_SIZE + ty;
+	int col = bx * BLOCK_SIZE + tx;
 
-    int min = 9999;
-    for(int i = 0; i < 9; i++)
-    {
-    	int tmp = input_img[col + row * n + i * n * m];
-    	min = tmp < min ? tmp : min;
-    }
+	int min = 9999;
+	int min_index = 0;
+	for (int i = 0; i < 9; i++) {
+		int tmp = input_img[col + row * n].dispersions[i];
 
-    output_img[col + row * n] = min;
+		if (tmp < min && tmp >= 0) {
+			min = tmp;
+			min_index = i;
+		}
+	}
+
+	output_img[col + row * n] = input_img[col + row * n].avgerages[min_index];
 }
 
-void init(int block_dim, unsigned char * img, int rows, int cols, unsigned char * filtered_img) {
+void init(int block_dim, unsigned char * img, int rows, int cols,
+		unsigned char * filtered_img) {
 
 	// Device input image and filtered image
-	unsigned char *d_img, *d_tmp, *d_filtered;
-	int size = rows * cols * sizeof(unsigned char);
+	unsigned char *d_img, *d_filtered;
+
+	// The temporary matrix holding the averages
+	// and dispersions for all 9 mask positions
+	Pair *d_tmp;
 
 	// Allocate and copy input image to device
+	int size = rows * cols * sizeof(unsigned char);
 	cudaMalloc((void**) &d_img, size);
 	cudaMemcpy(d_img, img, size, cudaMemcpyHostToDevice);
-
-	// Allocate memory for tmp matrix
-	cudaMalloc((void**) &d_tmp, size * 9);
 
 	// Allocate memory for output image
 	cudaMalloc((void**) &d_filtered, size);
 
+	// Allocate memory for tmp matrix
+	int size_pair = rows * cols * sizeof(Pair);
+	cudaMalloc((void**) &d_tmp, size_pair);
+
 	// Define grid and block dimensions
-	dim3 block(block_dim,block_dim,1);
-	dim3 grid(ceil(cols/block_dim), ceil(rows/block_dim),1);
+	dim3 block(block_dim, block_dim, 1);
+
+	dim3 grid((int) ceil((rows * 1.0) / (block_dim - 2)),
+			(int) ceil((cols * 1.0) / (block_dim - 2)), 1);
 
 	// Kernel invocations
-	rotatingMaskCUDA<8><<<grid,block>>> (d_tmp, d_img, rows, cols);
-	getArrayMin<8><<<grid, block>>> (d_filtered, d_tmp, rows, cols);
+	rotatingMaskCUDA<8> <<<grid, block>>>(d_tmp, d_img, rows, cols);
+
+	dim3 grid2((int) ceil((rows * 1.0) / block_dim),
+			(int) ceil((cols * 1.0) / block_dim), 1);
+	getArrayMin<8> <<<grid2, block>>>(d_filtered, d_tmp, rows, cols);
 
 	// Copy the filtered image to the host memory
 	cudaMemcpy(filtered_img, d_filtered, size, cudaMemcpyDeviceToHost);
@@ -142,44 +177,47 @@ void init(int block_dim, unsigned char * img, int rows, int cols, unsigned char 
 	cudaFree(d_filtered);
 }
 
-int main(int argc, char **argv)
-{
-	// Random number generator
+int main(int argc, char **argv) {
+// Random number generator
 	srand(time(NULL));
 
-	// Size of input and output images
+// Size of input and output images
 	unsigned int size = 16 * 16 * sizeof(unsigned char);
 
-	unsigned char *matrix = (unsigned char *)malloc(size);
-	unsigned char *filtered_img = (unsigned char *)malloc(size);
+	unsigned char *matrix = (unsigned char *) malloc(size);
+	unsigned char *filtered_img = (unsigned char *) malloc(size);
 
-	for(int i = 0; i < 16; i++)
-	{
-		for(int j = 0; j < 16; j++)
-		{
-			matrix[i + j * 16] = rand() % 256 ;
+	for (int i = 0; i < 16; i++) {
+		for (int j = 0; j < 16; j++) {
+			matrix[j + i * 16] = rand() % 256;
 		}
 	}
 
 	init(8, matrix, 16, 16, filtered_img);
 
-	for(int i = 0; i < 16; i++)
-	{
-		for(int j = 0; j < 16; j++)
-		{
-			printf("%d ", matrix[i + j * 16]);
+	for (int i = 0; i < 15; i++) {
+		printf("{");
+		for (int j = 0; j < 15; j++) {
+			printf("%d, ", matrix[j + i * 16]);
 		}
+		printf("%d", matrix[15 + i * 16]);
+		printf("},");
 		printf("\n");
 	}
+	printf("{");
+	for (int j = 0; j < 15; j++) {
+		printf("%d, ", matrix[j + 15 * 16]);
+	}
+	printf("%d", matrix[15 + 15 * 16]);
+	printf("}");
+	printf("\n");
 
 	printf("Filtered\n");
 	printf("\n");
 
-	for(int i = 0; i < 16; i++)
-	{
-		for(int j = 0; j < 16; j++)
-		{
-			printf("%d ", filtered_img[i + j * 16]);
+	for (int i = 0; i < 16; i++) {
+		for (int j = 0; j < 16; j++) {
+			printf("%d ", filtered_img[j + i * 16]);
 		}
 		printf("\n");
 	}
