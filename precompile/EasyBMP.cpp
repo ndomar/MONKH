@@ -1903,3 +1903,67 @@ bool Rescale( BMP& InputImage , char mode, int NewDimension )
  *InputImage(NewWidth-1,NewHeight-1) = *OldImage(OldWidth-1,OldHeight-1);
  return true;
 }
+
+/*
+ * returns a pointer to a 2d array of unsigned chars representing the brightnesses
+ * of pixels of the given bmp image at the given channel
+ */
+unsigned char* BMP::getPixelArray(Channel channel)
+{
+	int width = this->TellWidth();
+	int height = this->TellHeight();
+	unsigned char* pixelArray = (unsigned char *) malloc(sizeof(unsigned char) * width * height);
+	
+	int i, j;
+	switch(channel) {
+	case Red:
+		for (i = 0; i < height; i++) {
+			for (j = 0; j < width; j++) {
+				pixelArray[i * width + j] = (*this)(i, j)->Red;
+			}
+		}
+	break;
+	case Green:
+		for (i = 0; i < height; i++) {
+			for (j = 0; j < width; j++) {
+				pixelArray[i * width + j] = (*this)(i, j)->Green;
+			}
+		}
+		break;
+	case Blue:
+		for (i = 0; i < height; i++) {
+			for (j = 0; j < width; j++) {
+				pixelArray[i * width + j] = (*this)(i, j)->Blue;
+			}
+		}
+		break;
+	case Alpha:
+		for (i = 0; i < height; i++) {
+			for (j = 0; j < width; j++) {
+				pixelArray[i * width + j] = (*this)(i, j)->Alpha;
+			}
+		}
+		break;
+	}
+	return pixelArray;
+}
+
+/*
+ * returns a BMP constructed from the 4 pixel arrays (1 for each RGBA channel) passed to the function
+ */
+void BMP::bmpFromPixelArrays(unsigned char* pixelArray_r, unsigned char* pixelArray_g, unsigned char* pixelArray_b, 
+	unsigned char* pixelArray_a, int width, int height)
+{	
+  this->SetSize(width,height);
+  this->SetBitDepth(24);
+	
+	int i, j;
+	for (i = 0; i < height; i++) {
+		for (j = 0; j < width; j++) {
+			(*this)(i,j)->Red = pixelArray_r[i * width + j];
+			(*this)(i,j)->Green = pixelArray_g[i * width + j];
+			(*this)(i,j)->Blue = pixelArray_b[i * width + j];
+			(*this)(i,j)->Alpha = pixelArray_a[i * width + j];
+		}
+	}
+}
