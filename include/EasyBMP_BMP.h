@@ -85,7 +85,7 @@ class BMP
  bool SetColor( int ColorNumber, RGBApixel NewColor ); 
  
  unsigned char* getPixelArray(Channel channel);
- void bmpFromPixelArrays(unsigned char* pixelArray_r, unsigned char* pixelArray_g, unsigned char* pixelArray_b, 
+ void fromPixelArrays(unsigned char* pixelArray_r, unsigned char* pixelArray_g, unsigned char* pixelArray_b, 
 	unsigned char* pixelArray_a, int width, int height);
 };
 

@@ -1951,7 +1951,7 @@ unsigned char* BMP::getPixelArray(Channel channel)
 /*
  * returns a BMP constructed from the 4 pixel arrays (1 for each RGBA channel) passed to the function
  */
-void BMP::bmpFromPixelArrays(unsigned char* pixelArray_r, unsigned char* pixelArray_g, unsigned char* pixelArray_b, 
+void BMP::fromPixelArrays(unsigned char* pixelArray_r, unsigned char* pixelArray_g, unsigned char* pixelArray_b, 
 	unsigned char* pixelArray_a, int width, int height)
 {	
   this->SetSize(width,height);

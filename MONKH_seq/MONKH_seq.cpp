@@ -147,7 +147,7 @@ void filterNoise(char* fileIn, char* fileOut) {
   pixelsOut_a = rotMaskSeq(pixelsIn_a, width, height);
   
   // write the computed channels to a bmp image file
-  imgOut.bmpFromPixelArrays(pixelsOut_r, pixelsOut_g, pixelsOut_b, pixelsOut_a, width, height);
+  imgOut.fromPixelArrays(pixelsOut_r, pixelsOut_g, pixelsOut_b, pixelsOut_a, width, height);
   imgOut.WriteToFile(fileOut);
 }
 
