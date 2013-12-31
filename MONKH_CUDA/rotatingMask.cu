@@ -7,11 +7,8 @@
 #include <cuda_runtime.h>
 #include <helper_functions.h>
 
-#include "monkh_seq.c"
-#include "compare.c"
-
-#include "EasyBMP.h"
-#include "EasyBMP.cpp"
+#include <EasyBMP.h>
+#include <EasyBMP.cpp>
 
 #define BLOCK_DIM 16
 
