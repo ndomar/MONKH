@@ -1919,28 +1919,28 @@ unsigned char* BMP::getPixelArray(Channel channel)
 	case Red:
 		for (i = 0; i < height; i++) {
 			for (j = 0; j < width; j++) {
-				pixelArray[i * width + j] = (*this)(i, j)->Red;
+				pixelArray[i * width + j] = (*this)(j, i)->Red;
 			}
 		}
 	break;
 	case Green:
 		for (i = 0; i < height; i++) {
 			for (j = 0; j < width; j++) {
-				pixelArray[i * width + j] = (*this)(i, j)->Green;
+				pixelArray[i * width + j] = (*this)(j, i)->Green;
 			}
 		}
 		break;
 	case Blue:
 		for (i = 0; i < height; i++) {
 			for (j = 0; j < width; j++) {
-				pixelArray[i * width + j] = (*this)(i, j)->Blue;
+				pixelArray[i * width + j] = (*this)(j, i)->Blue;
 			}
 		}
 		break;
 	case Alpha:
 		for (i = 0; i < height; i++) {
 			for (j = 0; j < width; j++) {
-				pixelArray[i * width + j] = (*this)(i, j)->Alpha;
+				pixelArray[i * width + j] = (*this)(j, i)->Alpha;
 			}
 		}
 		break;
@@ -1960,10 +1960,10 @@ void BMP::fromPixelArrays(unsigned char* pixelArray_r, unsigned char* pixelArray
 	int i, j;
 	for (i = 0; i < height; i++) {
 		for (j = 0; j < width; j++) {
-			(*this)(i,j)->Red = pixelArray_r[i * width + j];
-			(*this)(i,j)->Green = pixelArray_g[i * width + j];
-			(*this)(i,j)->Blue = pixelArray_b[i * width + j];
-			(*this)(i,j)->Alpha = pixelArray_a[i * width + j];
+			(*this)(j, i)->Red = pixelArray_r[i * width + j];
+			(*this)(j, i)->Green = pixelArray_g[i * width + j];
+			(*this)(j, i)->Blue = pixelArray_b[i * width + j];
+			(*this)(j, i)->Alpha = pixelArray_a[i * width + j];
 		}
 	}
 }
