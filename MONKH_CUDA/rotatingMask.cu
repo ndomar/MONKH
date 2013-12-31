@@ -21,7 +21,7 @@ typedef struct {
  * and outputs the filtered image
  */
 template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
-		unsigned char * img, int n, int m) {
+		unsigned char * img, int rows, int cols) {
 	__shared__ unsigned char input_img[BLOCK_SIZE][BLOCK_SIZE];
 
 	// Block index
@@ -39,21 +39,22 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 	row -= 2 * by;
 	col -= 2 * bx;
 
-	if (row < m && col < n)
-		input_img[ty][tx] = img[n * row + col];
+	if (row < rows && col < cols)
+		input_img[ty][tx] = img[cols * row + col];
 
 	__syncthreads();
 
-	if (row < m && col < n) {
-		int numberOfBlocksx = (int) ceil((n * 1.0) / (BLOCK_SIZE - 2));
-		int numberOfBlocksy = (int) ceil((m * 1.0) / (BLOCK_SIZE - 2));
+	if (row < rows && col < cols) {
+		int numberOfBlocksx = (int) ceil((cols * 1.0) / (BLOCK_SIZE - 2));
+		int numberOfBlocksy = (int) ceil((rows * 1.0) / (BLOCK_SIZE - 2));
+
 		// Check if this pixel should compute the average and the dispersion
 		if ((bx < numberOfBlocksx - 1
 				|| (bx == numberOfBlocksx - 1
-						&& (tx < n - bx * (BLOCK_SIZE - 2) - 2)))
+						&& (tx < cols - bx * (BLOCK_SIZE - 2) - 2)))
 				&& (by < numberOfBlocksy - 1
 						|| (by == numberOfBlocksy - 1
-								&& (ty < m - by * (BLOCK_SIZE - 2) - 2)))) {
+								&& (ty < rows - by * (BLOCK_SIZE - 2) - 2)))) {
 			if (tx < BLOCK_SIZE - 2 && ty < BLOCK_SIZE - 2) {
 
 				/* Calculate the average for the mask
@@ -99,9 +100,9 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 						int tmp_col = col + j;
 						int tmp_row = row + i;
 
-						filtered[tmp_col + tmp_row * n].avgerages[index] =
+						filtered[tmp_col + tmp_row * cols].avgerages[index] =
 								average;
-						filtered[tmp_col + tmp_row * n].dispersions[index] =
+						filtered[tmp_col + tmp_row * cols].dispersions[index] =
 								dispersion;
 						index++;
 					}
@@ -112,7 +113,7 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 }
 
 template<int BLOCK_SIZE> __global__ void getArrayMin(unsigned char * output_img,
-		Pair * input_img, int n, int m) {
+		Pair * input_img, int rows, int cols) {
 	/* Calculate the index of the 2d array */
 	int bx = blockIdx.x;
 	int by = blockIdx.y;
@@ -126,20 +127,14 @@ template<int BLOCK_SIZE> __global__ void getArrayMin(unsigned char * output_img,
 	float min = FLT_MAX;
 	int min_index = 0;
 	for (int i = 0; i < 9; i++) {
-		float tmp = input_img[col + row * n].dispersions[i];
-
-		if (row == 544 && col == 39) {
-			printf("index: %d dispersion: %f average: %f \n ", i,
-					input_img[col + row * n].dispersions[i],
-					input_img[col + row * n].avgerages[i]);
-		}
+		float tmp = input_img[col + row * cols].dispersions[i];
 
 		if (tmp < min && tmp >= 0) {
 			min = tmp;
 			min_index = i;
 		}
 	}
-	output_img[col + row * n] = input_img[col + row * n].avgerages[min_index];
+	output_img[col + row * cols] = input_img[col + row * cols].avgerages[min_index];
 }
 
 unsigned char * init(unsigned char * img, int rows, int cols) {
@@ -169,14 +164,14 @@ unsigned char * init(unsigned char * img, int rows, int cols) {
 	// Define grid and block dimensions
 	dim3 block(BLOCK_DIM, BLOCK_DIM, 1);
 
-	dim3 grid((int) ceil((rows * 1.0) / (BLOCK_DIM - 2)),
-			(int) ceil((cols * 1.0) / (BLOCK_DIM - 2)), 1);
+	dim3 grid((int) ceil((cols * 1.0) / (BLOCK_DIM - 2)),
+			(int) ceil((rows * 1.0) / (BLOCK_DIM - 2)), 1);
 
 	// Kernel invocations
 	rotatingMaskCUDA<BLOCK_DIM> <<<grid, block>>>(d_tmp, d_img, rows, cols);
 
-	dim3 grid2((int) ceil((rows * 1.0) / BLOCK_DIM),
-			(int) ceil((cols * 1.0) / BLOCK_DIM), 1);
+	dim3 grid2((int) ceil((cols * 1.0) / BLOCK_DIM),
+			(int) ceil((rows * 1.0) / BLOCK_DIM), 1);
 
 	getArrayMin<BLOCK_DIM> <<<grid2, block>>>(d_filtered, d_tmp, rows, cols);
 
@@ -236,7 +231,8 @@ int main(int argc, char **argv) {
 
 	BMP imgIn, imgOut;
 
-	imgIn.ReadFromFile("../test images/lena_noise.bmp");
+	imgIn.ReadFromFile("../test images/Stress Test.bmp");
+
 	int width = imgIn.TellWidth();
 	int height = imgIn.TellHeight();
 
@@ -258,7 +254,7 @@ int main(int argc, char **argv) {
 	// write the computed channels to a bmp image file
 	imgOut.fromPixelArrays(pixelsOut_r, pixelsOut_g, pixelsOut_b, pixelsOut_a,
 			width, height);
-	imgOut.WriteToFile("lena_noise_filtered.bmp");
+	imgOut.WriteToFile("../output images/Stress Test_filtered.bmp");
 
 	return 0;
 }
