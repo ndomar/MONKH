@@ -65,13 +65,11 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 
 				float sum = 0;
 				for (int i = 0; i < 3; i++) {
-					for (int j = 0; j < 3; j++) {
+					int tmp_row = ty + i;
 
-						int tmp_col = tx + j;
-						int tmp_row = ty + i;
-
-						sum += input_img[tmp_row][tmp_col];
-					}
+					sum += input_img[tmp_row][tx + 0];
+					sum += input_img[tmp_row][tx + 1];
+					sum += input_img[tmp_row][tx + 2];
 				}
 
 				float average = sum / 9;
@@ -81,12 +79,15 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 				 * the upper-left corner */
 				float dispersion = 0;
 				for (int i = 0; i < 3; i++) {
-					for (int j = 0; j < 3; j++) {
-						int tmp_col = tx + j;
-						int tmp_row = ty + i;
-						dispersion += (input_img[tmp_row][tmp_col] - average)
-								* (input_img[tmp_row][tmp_col] - average);
-					}
+					int tmp_row = ty + i;
+					dispersion += (input_img[tmp_row][tx + 0] - average)
+							* (input_img[tmp_row][tx + 0] - average);
+
+					dispersion += (input_img[tmp_row][tx + 1] - average)
+							* (input_img[tmp_row][tx + 1] - average);
+
+					dispersion += (input_img[tmp_row][tx + 2] - average)
+							* (input_img[tmp_row][tx + 2] - average);
 				}
 
 //				dispersion /= 9;
@@ -98,16 +99,25 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 				 */
 				int index = 0;
 				for (int i = 0; i < 3; i++) {
-					for (int j = 0; j < 3; j++) {
-						int tmp_col = col + j;
-						int tmp_row = row + i;
+					int tmp_row = row + i;
 
-						filtered[tmp_col + tmp_row * cols].avgerages[index] =
-								average;
-						filtered[tmp_col + tmp_row * cols].dispersions[index] =
-								dispersion;
-						index++;
-					}
+					filtered[col + 0 + tmp_row * cols].avgerages[index] =
+							average;
+					filtered[col + 0 + tmp_row * cols].dispersions[index] =
+							dispersion;
+					index++;
+
+					filtered[col + 1 + tmp_row * cols].avgerages[index] =
+							average;
+					filtered[col + 1 + tmp_row * cols].dispersions[index] =
+							dispersion;
+					index++;
+
+					filtered[col + 2 + tmp_row * cols].avgerages[index] =
+							average;
+					filtered[col + 2 + tmp_row * cols].dispersions[index] =
+							dispersion;
+					index++;
 				}
 			}
 		}
@@ -129,12 +139,26 @@ template<int BLOCK_SIZE> __global__ void getArrayMin(unsigned char * output_img,
 	float min = FLT_MAX;
 	int min_index = 0;
 	float  *dispersions = input_img[col + row * cols].dispersions;
-	for (int i = 0; i < 9; i++) {
+	for (int i = 0; i < 9; i+=3) {
 		float tmp = dispersions[i];
 
 		if (tmp < min && tmp >= 0) {
 			min = tmp;
 			min_index = i;
+		}
+
+		tmp = dispersions[i + 1];
+
+		if (tmp < min && tmp >= 0) {
+			min = tmp;
+			min_index = i + 1;
+		} 
+
+		tmp = dispersions[i + 2];
+
+		if (tmp < min && tmp >= 0) {
+			min = tmp;
+			min_index = i + 2;
 		}
 	}
 	output_img[col + row * cols] = input_img[col + row * cols].avgerages[min_index];
