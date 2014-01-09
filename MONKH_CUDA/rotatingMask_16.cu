@@ -89,8 +89,6 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 					}
 				}
 
-//				dispersion /= 9;
-
 				/* Assign the value of the calculated mask to each pixel
 				 * i.e. the current mask will be added to index 0
 				 * of the Upper left pixel, and index 1 of the
@@ -116,6 +114,7 @@ template<int BLOCK_SIZE> __global__ void rotatingMaskCUDA(Pair * filtered,
 
 template<int BLOCK_SIZE> __global__ void getArrayMin(unsigned char * output_img,
 		Pair * input_img, int rows, int cols) {
+	
 	/* Calculate the index of the 2d array */
 	int bx = blockIdx.x;
 	int by = blockIdx.y;
